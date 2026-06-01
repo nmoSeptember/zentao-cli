@@ -292,7 +292,11 @@ export function resolveActionUrl(
 }
 
 /** 根据 action.resultGetter 从 API 原始响应中提取结果数据 */
-export function extractResult(action: ModuleAction, response: Record<string, unknown>): unknown {
+export function extractResult(
+    action: ModuleAction,
+    response: Record<string, unknown>,
+    apiVersion: 'v1' | 'v2' = 'v2',
+): unknown {
     const getter = action.resultGetter;
     if (!getter) return response;
 
@@ -300,7 +304,13 @@ export function extractResult(action: ModuleAction, response: Record<string, unk
         return getter(response, {});
     }
     if (typeof getter === 'string') {
-        return getProperty(response, getter);
+        const value = getProperty(response, getter);
+        if (value !== undefined) return value;
+        // v1 单对象接口直接返回实体字段，无 product/bug 等包装键
+        if (apiVersion === 'v1' && response.id !== undefined) {
+            return response;
+        }
+        return value;
     }
     if (typeof getter === 'object') {
         const result: Record<string, unknown> = {};

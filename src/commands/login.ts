@@ -58,22 +58,39 @@ export function registerLoginCommand(program: Command): void {
                     const client = new ZentaoClient(server, token, {
                         insecure: globalOpts.insecure,
                         timeout: globalOpts.timeout,
+                        apiVersion: oldProfile?.apiVersion ?? 'v2',
                     });
                     const { serverConfig, user } = await verifyToken(client, account);
-                    profile = buildProfile(server, account, token, serverConfig, user, oldProfile);
+                    profile = buildProfile(
+                        server,
+                        account,
+                        token,
+                        serverConfig,
+                        user,
+                        oldProfile,
+                        oldProfile?.apiVersion ?? 'v2',
+                    );
                 } else {
                     const result = await login(server, account, password, {
                         insecure: globalOpts.insecure,
                         timeout: globalOpts.timeout,
                     });
 
-                    profile = buildProfile(server, account, result.token, result.serverConfig, result.user, oldProfile);
+                    profile = buildProfile(
+                        result.server,
+                        account,
+                        result.token,
+                        result.serverConfig,
+                        result.user,
+                        oldProfile,
+                        result.apiVersion,
+                    );
                 }
 
                 saveProfile(profile);
 
                 if (!globalOpts.silent) {
-                    console.log(`登录成功: ${profileKey(account, server)}`);
+                    console.log(`登录成功: ${profileKey(profile.account, profile.server)}`);
                 }
             } catch (error) {
                 if (error instanceof ZentaoError) {

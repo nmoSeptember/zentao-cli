@@ -29,7 +29,10 @@ export async function ensureAuth(options?: { insecure?: boolean; timeout?: numbe
         currentProfile.lastUsedTime = new Date().toISOString();
         saveProfile(currentProfile);
         return {
-            client: new ZentaoClient(currentProfile.server, currentProfile.token, clientOpts),
+            client: new ZentaoClient(currentProfile.server, currentProfile.token, {
+                ...clientOpts,
+                apiVersion: currentProfile.apiVersion ?? 'v2',
+            }),
             profile: currentProfile,
         };
     }
@@ -43,7 +46,10 @@ export async function ensureAuth(options?: { insecure?: boolean; timeout?: numbe
             const profile = buildProfile(env.url, env.account, env.token, undefined, undefined, existingProfile);
             saveProfile(profile);
             return {
-                client: new ZentaoClient(env.url, env.token, clientOpts),
+                client: new ZentaoClient(env.url, env.token, {
+                    ...clientOpts,
+                    apiVersion: existingProfile?.apiVersion ?? 'v2',
+                }),
                 profile,
             };
         }
@@ -51,10 +57,21 @@ export async function ensureAuth(options?: { insecure?: boolean; timeout?: numbe
         if (env.password) {
             const clientOpts = { insecure: options?.insecure, timeout: options?.timeout };
             const result = await login(env.url, env.account, env.password, clientOpts);
-            const profile = buildProfile(env.url, env.account, result.token, undefined, result.user);
+            const profile = buildProfile(
+                result.server,
+                env.account,
+                result.token,
+                result.serverConfig,
+                result.user,
+                undefined,
+                result.apiVersion,
+            );
             saveProfile(profile);
             return {
-                client: new ZentaoClient(env.url, result.token, clientOpts),
+                client: new ZentaoClient(result.server, result.token, {
+                    ...clientOpts,
+                    apiVersion: result.apiVersion,
+                }),
                 profile,
             };
         }

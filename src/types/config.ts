@@ -1,3 +1,5 @@
+import type { ApiVersion } from '../api/version.js';
+
 /** 工作区中关联对象的简要引用信息 */
 export interface WorkspaceRef {
     /** 对象 ID */
@@ -91,6 +93,8 @@ export interface Profile {
     config?: UserConfig;
     /** 禅道服务端配置 */
     serverConfig?: ServerConfig;
+    /** REST API 版本（禅道 18.0 开源版通常为 v1） */
+    apiVersion?: ApiVersion;
 }
 
 export interface UpdateCheckData {

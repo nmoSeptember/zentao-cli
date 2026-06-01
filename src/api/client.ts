@@ -1,23 +1,33 @@
 import { ZentaoError } from '../errors.js';
 import type { ApiResponse, RequestOptions, ServerConfig } from '../types/index.js';
+import {
+    buildApiBaseUrl,
+    normalizeV1Response,
+    translateQueryForV1,
+    type ApiVersion,
+} from './version.js';
 
-/** 创建 {@link ZentaoClient} 时的可选行为（TLS、超时等） */
+/** 创建 {@link ZentaoClient} 时的可选行为（TLS、超时、API 版本等） */
 export interface ClientOptions {
     /** 为 true 时跳过 TLS 证书校验（仅在单次请求期间临时设置环境变量） */
     insecure?: boolean;
     /** 默认请求超时（毫秒），可被单次 {@link RequestOptions.timeout} 覆盖 */
     timeout?: number;
+    /** REST API 版本，默认 v2；禅道 18.0 开源版通常需使用 v1 */
+    apiVersion?: ApiVersion;
 }
 
 /**
- * 禅道 REST API v2 的轻量封装。
- * 负责拼接 `.../api.php/v2` 前缀、注入 Token、序列化 JSON，并将 HTTP/网络错误映射为 {@link ZentaoError}。
+ * 禅道 REST API 的轻量封装。
+ * 负责拼接 `.../api.php/v1|v2` 前缀、注入 Token、序列化 JSON，并将 HTTP/网络错误映射为 {@link ZentaoError}。
  */
 export class ZentaoClient {
     readonly baseUrl: string;
+    readonly apiVersion: ApiVersion;
     private token: string;
     private timeout: number;
     private insecure: boolean;
+    private readonly serverUrl: string;
 
     /**
      * @param serverUrl 禅道站点根地址，如 `https://zentao.example.com`（末尾 `/` 会被去掉）
@@ -25,8 +35,9 @@ export class ZentaoClient {
      * @param options 客户端级选项
      */
     constructor(serverUrl: string, token: string, options?: ClientOptions) {
-        const url = serverUrl.replace(/\/+$/, '');
-        this.baseUrl = `${url}/api.php/v2`;
+        this.serverUrl = serverUrl.replace(/\/+$/, '');
+        this.apiVersion = options?.apiVersion ?? 'v2';
+        this.baseUrl = buildApiBaseUrl(this.serverUrl, this.apiVersion);
         this.token = token;
         this.timeout = options?.timeout ?? 10000;
         this.insecure = options?.insecure ?? false;
@@ -44,8 +55,11 @@ export class ZentaoClient {
     ): Promise<T> {
         let url = `${this.baseUrl}${path}`;
         if (options?.query) {
+            const query = this.apiVersion === 'v1'
+                ? translateQueryForV1(options.query)
+                : options.query;
             const search = new URLSearchParams();
-            for (const [key, value] of Object.entries(options.query)) {
+            for (const [key, value] of Object.entries(query)) {
                 if (value === undefined) continue;
                 search.set(key, String(value));
             }
@@ -90,6 +104,20 @@ export class ZentaoClient {
             } catch (error) {
                 throw new ZentaoError('E2008', { url: response.url, status: response.status.toString(), statusText: response.statusText, serverResponse: responseText });
             }
+
+            if (this.apiVersion === 'v1') {
+                const record = data as Record<string, unknown>;
+                if (record.error) {
+                    throw new ZentaoError('E2008', {
+                        url: response.url,
+                        status: response.status.toString(),
+                        statusText: response.statusText,
+                        serverResponse: String(record.error),
+                    });
+                }
+                return normalizeV1Response(record) as T;
+            }
+
             if (data.status === 'fail') {
                 throw new ZentaoError('E2008', { url: response.url, status: response.status.toString(), statusText: response.statusText, serverResponse: JSON.stringify(data.message || data) });
             }
@@ -105,7 +133,7 @@ export class ZentaoClient {
                 throw new ZentaoError('E5002');
             }
             if (msg.includes('ECONNREFUSED') || msg.includes('ENOTFOUND') || msg.includes('fetch failed')) {
-                throw new ZentaoError('E1002', { url: this.baseUrl });
+                throw new ZentaoError('E1002', { url: this.serverUrl });
             }
             throw error;
         } finally {
@@ -157,12 +185,26 @@ export class ZentaoClient {
         this.token = token;
     }
 
-    /** 获取禅道服务端配置 */
+    /** 获取禅道服务端配置（v1 API 不支持此接口，返回占位配置） */
     async getServerConfig(): Promise<ServerConfig> {
-        const url = `${this.baseUrl.replace('/api.php/v2', '')}/?mode=getconfig`;
+        if (this.apiVersion === 'v1') {
+            return {
+                version: '18.0',
+                systemMode: '',
+                sprintConcept: '',
+                requestType: '',
+                requestFix: '',
+                moduleVar: '',
+                methodVar: '',
+                viewVar: '',
+                sessionVar: '',
+            };
+        }
+
+        const url = `${this.serverUrl}/?mode=getconfig`;
         const response = await fetch(url, {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
         });
 
         if (!response.ok) {

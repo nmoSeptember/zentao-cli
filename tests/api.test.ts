@@ -27,6 +27,12 @@ describe('ZentaoClient', () => {
         const client = new ZentaoClient('https://zentao.example.com/zentao', 'token123');
         expect(client.baseUrl).toBe('https://zentao.example.com/zentao/api.php/v2');
     });
+
+    test('uses v1 base URL when apiVersion is v1', () => {
+        const client = new ZentaoClient('https://zentao.example.com/zentao', 'token123', { apiVersion: 'v1' });
+        expect(client.baseUrl).toBe('https://zentao.example.com/zentao/api.php/v1');
+        expect(client.apiVersion).toBe('v1');
+    });
 });
 
 describe('ZentaoClient HTTP behavior', () => {

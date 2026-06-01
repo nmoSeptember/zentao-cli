@@ -57,7 +57,7 @@ export async function executeResolvedModuleCommand(
     const fields = parseFields(options.pick);
 
     if (command.action.type === 'list') {
-        let data = extractResult(command.action, rawResponse) as Record<string, unknown>[];
+        let data = extractResult(command.action, rawResponse, client.apiVersion) as Record<string, unknown>[];
         const pager = extractPager(command.action, rawResponse);
 
         if (config.htmlToMarkdown !== false) {
@@ -83,7 +83,7 @@ export async function executeResolvedModuleCommand(
     }
 
     if (command.action.type === 'get') {
-        let data = (extractResult(command.action, rawResponse) ?? rawResponse) as Record<string, unknown>;
+        let data = (extractResult(command.action, rawResponse, client.apiVersion) ?? rawResponse) as Record<string, unknown>;
         if (config.htmlToMarkdown !== false) {
             data = convertHtmlFields(data);
         }
@@ -94,7 +94,7 @@ export async function executeResolvedModuleCommand(
         return { command, data, rawResponse, fields, isList: false };
     }
 
-    const data = extractResult(command.action, rawResponse);
+    const data = extractResult(command.action, rawResponse, client.apiVersion);
     return { command, data, rawResponse, fields, isList: false };
 }
 
