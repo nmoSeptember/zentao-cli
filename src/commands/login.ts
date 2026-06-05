@@ -84,6 +84,7 @@ export function registerLoginCommand(program: Command): void {
                         result.user,
                         oldProfile,
                         result.apiVersion,
+                        password,
                     );
                 }
 

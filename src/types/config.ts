@@ -79,6 +79,11 @@ export interface Profile {
     account: string;
     /** API Token，通过登录接口获取 */
     token: string;
+    /**
+     * 登录密码（可选）。保存在本地配置文件中，用于 Token 失效时自动重新登录。
+     * 配置文件权限为 0600，仅当前用户可读。
+     */
+    password?: string;
     /** 登录后获取的用户详情 */
     user?: Record<string, unknown>;
     /** 登录时间 (ISO 8601) */

@@ -1,7 +1,13 @@
 import { describe, test, expect, afterEach, beforeEach } from 'bun:test';
+import { join } from 'node:path';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { ZentaoClient } from '../src/api/client';
 import { verifyToken, getEnvCredentials } from '../src/auth/login';
+import { ensureAuth } from '../src/auth/flow';
+import { saveProfile, getCurrentProfile, setConfigPath } from '../src/config/store';
 import { ZentaoError } from '../src/errors';
+import { resetConfigStore } from './helpers';
 
 type RouteHandler = (req: Request, url: URL) => Response | Promise<Response>;
 
@@ -213,5 +219,84 @@ describe('getEnvCredentials', () => {
         expect(env.account).toBe('admin');
         expect(env.token).toBe('abc');
         expect(env.password).toBeUndefined();
+    });
+});
+
+describe('ensureAuth', () => {
+    let tempDir: string;
+    let server: ReturnType<typeof Bun.serve>;
+    let loginCount = 0;
+
+    beforeEach(() => {
+        resetConfigStore();
+        tempDir = mkdtempSync(join(tmpdir(), 'zentao-cli-ensure-auth-'));
+        setConfigPath(join(tempDir, 'config.json'));
+        loginCount = 0;
+
+        server = Bun.serve({
+            port: 0,
+            fetch(req) {
+                const url = new URL(req.url);
+                if (url.pathname === '/' && url.searchParams.get('mode') === 'getconfig') {
+                    return Response.json({ version: '22.0' });
+                }
+                if (url.pathname === '/api.php/v2/users/login' && req.method === 'POST') {
+                    loginCount += 1;
+                    return Response.json({ status: 'success', token: `fresh-token-${loginCount}` });
+                }
+                if (url.pathname === '/api.php/v2/users') {
+                    const token = req.headers.get('Token') ?? '';
+                    if (token === 'expired-token') {
+                        return new Response('Unauthorized', { status: 401 });
+                    }
+                    return Response.json({
+                        status: 'success',
+                        users: [{ account: 'admin', realname: 'Admin' }],
+                    });
+                }
+                return new Response('not found', { status: 404 });
+            },
+        });
+
+        saveProfile({
+            server: server.url.toString().replace(/\/+$/, ''),
+            account: 'admin',
+            token: 'expired-token',
+            password: 'secret123',
+            loginTime: '2026-01-01T00:00:00Z',
+            lastUsedTime: '2026-01-01T00:00:00Z',
+        });
+    });
+
+    afterEach(() => {
+        server.stop();
+        resetConfigStore();
+        if (tempDir && existsSync(tempDir)) {
+            rmSync(tempDir, { recursive: true, force: true });
+        }
+    });
+
+    test('Token 失效且配置中有密码时自动重新登录', async () => {
+        const { client, profile } = await ensureAuth();
+        expect(loginCount).toBe(1);
+        expect(profile.token).toBe('fresh-token-1');
+        expect(profile.password).toBe('secret123');
+        expect(client).toBeInstanceOf(ZentaoClient);
+
+        const saved = getCurrentProfile();
+        expect(saved?.token).toBe('fresh-token-1');
+    });
+
+    test('Token 失效且无密码时抛 E1004', async () => {
+        saveProfile({
+            server: server.url.toString().replace(/\/+$/, ''),
+            account: 'admin',
+            token: 'expired-token',
+            loginTime: '2026-01-01T00:00:00Z',
+            lastUsedTime: '2026-01-01T00:00:00Z',
+        });
+
+        await expect(ensureAuth()).rejects.toMatchObject({ code: '1004' });
+        expect(loginCount).toBe(0);
     });
 });

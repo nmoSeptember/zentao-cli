@@ -392,6 +392,17 @@ describe('buildProfile', () => {
         const profile = buildProfile('https://zentao.example.com', 'admin', 'tok', undefined, { realname: 'Super Admin' }, old);
         expect(profile.user).toEqual({ id: 1, realname: 'Super Admin' });
     });
+
+    test('preserves password from oldProfile when not provided', () => {
+        const old: Profile = { ...mockProfile, password: 'secret' };
+        const profile = buildProfile('https://zentao.example.com', 'admin', 'new-tok', undefined, undefined, old);
+        expect(profile.password).toBe('secret');
+    });
+
+    test('sets password when provided', () => {
+        const profile = buildProfile('https://zentao.example.com', 'admin', 'tok', undefined, undefined, undefined, undefined, 'new-secret');
+        expect(profile.password).toBe('new-secret');
+    });
 });
 
 describe('update check data', () => {

@@ -207,6 +207,7 @@ export function buildProfile(
     user?: Record<string, unknown>,
     oldProfile?: Profile,
     apiVersion?: Profile['apiVersion'],
+    password?: string,
 ): Profile {
     const now = new Date().toISOString();
     return {
@@ -214,6 +215,7 @@ export function buildProfile(
         server: server.replace(/\/+$/, ''),
         account,
         token,
+        password: password !== undefined ? password : oldProfile?.password,
         apiVersion: apiVersion ?? oldProfile?.apiVersion ?? 'v2',
         user: oldProfile ? {
             ...oldProfile.user,
