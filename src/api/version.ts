@@ -31,6 +31,34 @@ export function expandServerCandidates(serverUrl: string): string[] {
     return candidates;
 }
 
+/** v1 中 activate 动作的路径后缀（v2 为 activate） */
+const V1_ACTIVATE_PATH_SUFFIX = '/activate';
+
+/** v1 中 bug 激活动作的路径后缀 */
+const V1_BUG_ACTIVATE_PATH_SUFFIX = '/bugs/';
+
+/**
+ * 将 v2 风格的 action 请求适配为 v1：
+ * - 子资源动作（如 /bugs/1/resolve）由 PUT 改为 POST
+ * - Bug 激活路径 /bugs/{id}/activate 改为 /bugs/{id}/active
+ */
+export function translateRequestForV1(method: string, path: string): { method: string; path: string } {
+    let translatedMethod = method;
+    let translatedPath = path;
+
+    const actionMatch = path.match(/^(\/[^/]+\/\d+\/[^/]+)$/);
+    if (actionMatch && method.toUpperCase() === 'PUT') {
+        translatedMethod = 'POST';
+    }
+
+    if (translatedPath.endsWith(V1_ACTIVATE_PATH_SUFFIX)
+        && translatedPath.includes(V1_BUG_ACTIVATE_PATH_SUFFIX)) {
+        translatedPath = `${translatedPath.slice(0, -V1_ACTIVATE_PATH_SUFFIX.length)}/active`;
+    }
+
+    return { method: translatedMethod, path: translatedPath };
+}
+
 /** 将 v2 风格的分页查询参数映射为 v1（pageID→page，recPerPage→limit） */
 export function translateQueryForV1(
     query: Record<string, string | number>,

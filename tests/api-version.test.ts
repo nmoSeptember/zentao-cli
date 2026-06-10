@@ -4,6 +4,7 @@ import {
     expandServerCandidates,
     normalizeV1Response,
     translateQueryForV1,
+    translateRequestForV1,
 } from '../src/api/version';
 
 describe('api version helpers', () => {
@@ -41,6 +42,38 @@ describe('api version helpers', () => {
             pageID: 1,
             recTotal: 10,
             recPerPage: 20,
+        });
+    });
+
+    test('translateRequestForV1 maps action PUT to POST', () => {
+        expect(translateRequestForV1('PUT', '/bugs/22501/resolve')).toEqual({
+            method: 'POST',
+            path: '/bugs/22501/resolve',
+        });
+        expect(translateRequestForV1('PUT', '/stories/1/close')).toEqual({
+            method: 'POST',
+            path: '/stories/1/close',
+        });
+    });
+
+    test('translateRequestForV1 rewrites bug activate path to active', () => {
+        expect(translateRequestForV1('PUT', '/bugs/22501/activate')).toEqual({
+            method: 'POST',
+            path: '/bugs/22501/active',
+        });
+    });
+
+    test('translateRequestForV1 leaves CRUD PUT unchanged', () => {
+        expect(translateRequestForV1('PUT', '/bugs/22501')).toEqual({
+            method: 'PUT',
+            path: '/bugs/22501',
+        });
+    });
+
+    test('translateRequestForV1 leaves v2 GET unchanged', () => {
+        expect(translateRequestForV1('GET', '/bugs/22501')).toEqual({
+            method: 'GET',
+            path: '/bugs/22501',
         });
     });
 });

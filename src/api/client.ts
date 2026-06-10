@@ -4,6 +4,7 @@ import {
     buildApiBaseUrl,
     normalizeV1Response,
     translateQueryForV1,
+    translateRequestForV1,
     type ApiVersion,
 } from './version.js';
 
@@ -53,7 +54,13 @@ export class ZentaoClient {
         path: string,
         options?: RequestOptions,
     ): Promise<T> {
-        let url = `${this.baseUrl}${path}`;
+        let requestMethod = method;
+        let requestPath = path;
+        if (this.apiVersion === 'v1') {
+            ({ method: requestMethod, path: requestPath } = translateRequestForV1(method, path));
+        }
+
+        let url = `${this.baseUrl}${requestPath}`;
         if (options?.query) {
             const query = this.apiVersion === 'v1'
                 ? translateQueryForV1(options.query)
@@ -75,12 +82,12 @@ export class ZentaoClient {
         };
 
         const fetchOptions: globalThis.RequestInit = {
-            method: method.toUpperCase(),
+            method: requestMethod.toUpperCase(),
             headers,
             signal: controller.signal,
         };
 
-        if (options?.body && !['GET', 'HEAD'].includes(method.toUpperCase())) {
+        if (options?.body && !['GET', 'HEAD'].includes(requestMethod.toUpperCase())) {
             fetchOptions.body = JSON.stringify(options.body);
         }
 
